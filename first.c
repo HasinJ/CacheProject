@@ -19,25 +19,22 @@ int main(int argc, char const *argv[argc+1]) {
   //cache: 1st blocksize: 4th
   int cacheSize = atoi(argv[1]);
   int blockSize = atoi(argv[4]);
+  char assoc[7];
+  int n = 0;
   char policy[5];
   strcpy(policy,argv[3]);
-  int n = 0;
-  char assoc[7];
 
   if(argv[2][0]=='a' && argv[2][5]==':'){
     size_t j = 0;
     strcpy(assoc, "assoc");
     char *temp = malloc((strlen(argv[2])-6)*sizeof(char*));
-    for (size_t i = 6; i < strlen(argv[2]); i++) {
-      temp[j++]=argv[2][i];
-    }
+    for (size_t i = 6; i < strlen(argv[2]); i++) temp[j++]=argv[2][i];
     n = atoi(temp);
     free(temp);
   }else strcpy(assoc,argv[2]);
 
   printf("n%d\n",n);
   printf("%s\n", policy);
-
 
   if(checkSizes(cacheSize, blockSize)==0){
     printf("error\n");
