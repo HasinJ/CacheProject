@@ -5,20 +5,27 @@
 
 int cacheSize, blockSize;
 
-void sizes(char assoc, int* setSize, int* lineSize,int n){
+struct CacheLine{
+  int valid;
+  unsigned long int tag;
+  unsigned long int* blocks;
+};
+
+
+void sizes(char* assoc, int* setSize, int* linesPerSet,int n){
   switch(assoc[0]){
-    case "d":
+    case 'd':
       *setSize = cacheSize/blockSize;
-      *lineSize = 1;
-      return;
-    case "f":
+      *linesPerSet = 1;
+      break;
+    case 'f':
       *setSize = 1;
-      *lineSize = cacheSize/blockSize;
-      return;
-    case "a":
+      *linesPerSet = cacheSize/blockSize;
+      break;
+    case 'a':
       *setSize = cacheSize/(blockSize*n);
-      *lineSize=n;
-      return;
+      *linesPerSet=n;
+      break;
   }
 }
 
@@ -26,6 +33,13 @@ int checkSizes(int num1, int num2){
   if((ceil(log2(num1)) != floor(log2(num1)))) return 0;
   if((ceil(log2(num2)) != floor(log2(num2)))) return 0;
   return 1;
+}
+
+void freeEverything(int** cache, int setSize,int linesPerSet, int blockSize){
+  for (size_t i = 0; i < setSize; i++) {
+    free(cache[i]);
+  }
+  free(cache);
 }
 
 int main(int argc, char const *argv[argc+1]) {
@@ -75,18 +89,37 @@ int main(int argc, char const *argv[argc+1]) {
   //NEEDS TO CHECK FOR EACH LINE IN TRACE//
   /////////////////////////////////////////
 
-  int setSize=0, lineSize=0;
-  sizes(assoc, &setSize, &lineSize,n);
+  int setSize=0, linesPerSet=0;
+  sizes(assoc, &setSize, &linesPerSet,n);
 
-  log2(blockSize)
-  log2(setSize)
+  int offsetBits=log2(blockSize);
+  int setBits=log2(setSize);
+  int tagBits = 48 - setBits - offsetBits;
+  printf("tagBits: %d\n",tagBits);
+  printf("offsetBits: %d\n",offsetBits);
+  printf("setSize: %d\n",setSize);
+  printf("setBits: %d\n",setBits);
+  printf("linesPerSet: %d\n",linesPerSet);
+
 
   char access[2];
   unsigned long int address;
+  printf("\n");
   while(fscanf(f,"%s %lx",access,&address)!=EOF){
-
     printf("access:%s address:%lx\n", access, address);
+    unsigned long int offset = address & ((1<<offsetBits)-1);
+    unsigned long int setIndex = (address>>offsetBits) & ((1<<setBits)-1);
+    unsigned long int tag = (address >> (offsetBits+setBits)) & ((1<<tagBits)-1);
+    printf("offset: %ld setIndex: %ld tag: %ld\n", offset, setIndex, tag);
 
+    int **cache=calloc(setSize,sizeof(int*));
+    for (size_t i = 0; i < setSize; i++) {
+      cache[i]=calloc(linesPerSet,sizeof(struct CacheLine));
+    }
+
+    freeEverything(cache,setSize,linesPerSet,blockSize);
+
+    printf("\n");
   }
 
   return EXIT_SUCCESS;
