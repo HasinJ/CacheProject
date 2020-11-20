@@ -3,16 +3,17 @@
 #include <stdio.h>
 #include <math.h>
 
-int cacheSize, blockSize;
+unsigned long int cacheSize, blockSize;
+unsigned long int memread=0, memwrite=0, cachehit=0, cachemiss=0;
+char policy[5];
+unsigned long int t;
 
 struct CacheLine{
-  int valid;
   unsigned long int tag;
-  unsigned long int* blocks;
+  int valid;
 };
 
-
-void sizes(char* assoc, int* setSize, int* linesPerSet,int n){
+void sizes(char* assoc, unsigned long int* setSize, unsigned long int* linesPerSet,int n){
   switch(assoc[0]){
     case 'd':
       *setSize = cacheSize/blockSize;
@@ -35,11 +36,33 @@ int checkSizes(int num1, int num2){
   return 1;
 }
 
-void freeEverything(int** cache, int setSize,int linesPerSet, int blockSize){
+void freeEverything(struct CacheLine*** cache, int setSize, int linesPerSet, int blockSize){
   for (size_t i = 0; i < setSize; i++) {
     free(cache[i]);
   }
   free(cache);
+}
+
+
+void read(struct CacheLine*** cache,int linesPerSet,int setIndex,unsigned long int tag){
+  size_t i = 0;
+  for (; i < linesPerSet; i++) { //finds location of matching tag
+    printf("cache[setIndex][i].tag:%ld\n",cache[setIndex][i]->tag);
+    printf("tag:%ld\n",tag);
+    if (cache[setIndex][i]->tag==tag){
+      cachehit++;
+      return;}
+    else if (cache[setIndex][i]->valid==0){
+      cache[setIndex][i]->tag=tag;
+      cache[setIndex][i]->valid=1;
+      memread++;
+      cachemiss++;
+      return;}
+  }
+  //if it's not found use policy
+  memread++;
+  cachemiss++;
+  printf("not found: use policy\n");
 }
 
 int main(int argc, char const *argv[argc+1]) {
@@ -60,8 +83,7 @@ int main(int argc, char const *argv[argc+1]) {
 
 
   char assoc[7];
-  int n = 0;
-  char policy[5];
+  unsigned long int n = 0;
   strcpy(policy,argv[3]);
 
   if(argv[2][0]=='a' && argv[2][5]==':'){
@@ -75,7 +97,7 @@ int main(int argc, char const *argv[argc+1]) {
   else if(argv[2][0]=='a')  strcpy(assoc,"full");
   else strcpy(assoc,argv[2]);
 
-  printf("n%d\n",n);
+  printf("n%ld\n",n);
   printf("assoc: %s\n", assoc);
 
   FILE *f;
@@ -89,17 +111,17 @@ int main(int argc, char const *argv[argc+1]) {
   //NEEDS TO CHECK FOR EACH LINE IN TRACE//
   /////////////////////////////////////////
 
-  int setSize=0, linesPerSet=0;
+  unsigned long int setSize=0, linesPerSet=0;
   sizes(assoc, &setSize, &linesPerSet,n);
 
-  int offsetBits=log2(blockSize);
-  int setBits=log2(setSize);
-  int tagBits = 48 - setBits - offsetBits;
-  printf("tagBits: %d\n",tagBits);
-  printf("offsetBits: %d\n",offsetBits);
-  printf("setSize: %d\n",setSize);
-  printf("setBits: %d\n",setBits);
-  printf("linesPerSet: %d\n",linesPerSet);
+  unsigned long int offsetBits=log2(blockSize);
+  unsigned long int setBits=log2(setSize);
+  unsigned long int tagBits = 48 - setBits - offsetBits;
+  printf("tagBits: %ld\n",tagBits);
+  printf("offsetBits: %ld\n",offsetBits);
+  printf("setSize: %ld\n",setSize);
+  printf("setBits: %ld\n",setBits);
+  printf("linesPerSet: %ld\n",linesPerSet);
 
 
   char access[2];
@@ -112,15 +134,26 @@ int main(int argc, char const *argv[argc+1]) {
     unsigned long int tag = (address >> (offsetBits+setBits)) & ((1<<tagBits)-1);
     printf("offset: %ld setIndex: %ld tag: %ld\n", offset, setIndex, tag);
 
-    int **cache=calloc(setSize,sizeof(int*));
+    struct CacheLine** cache=calloc(setSize,sizeof(struct CacheLine));
     for (size_t i = 0; i < setSize; i++) {
       cache[i]=calloc(linesPerSet,sizeof(struct CacheLine));
+      for (size_t j = 0; j < linesPerSet; j++) {
+        cache[i][j].valid=0;
+      }
     }
 
-    freeEverything(cache,setSize,linesPerSet,blockSize);
+    if(access[0]=='R'){
+      read(&cache,linesPerSet,setIndex,tag);
+    }
 
+    else if(access[0]=='W'){
+
+    }
+
+
+    freeEverything(&cache,setSize,linesPerSet,blockSize);
     printf("\n");
   }
-
+  printf("memread:%ld\nmemwrite:%ld\ncachehit:%ld\ncachemiss:%ld\n", memread,memwrite,cachehit,cachemiss);
   return EXIT_SUCCESS;
 }
