@@ -11,6 +11,7 @@ unsigned long int t;
 struct CacheLine{
   unsigned long int tag;
   int valid;
+  struct CacheLine* next;
 };
 
 void sizes(char* assoc, unsigned long int* setSize, unsigned long int* linesPerSet,int n){
@@ -36,25 +37,33 @@ int checkSizes(int num1, int num2){
   return 1;
 }
 
-void freeEverything(struct CacheLine*** cache, int setSize, int linesPerSet, int blockSize){
+void freeNodes(struct Node* x){
+  if (x==0) return;
+  freeNodes(x->next);
+  free(x);
+  return;
+}
+
+void freeEverything(struct CacheLine** cache, int setSize, int linesPerSet, int blockSize){
   for (size_t i = 0; i < setSize; i++) {
-    free(cache[i]);
+    freeNodes(cache[i]);
   }
   free(cache);
 }
 
 
-void read(struct CacheLine*** cache,int linesPerSet,int setIndex,unsigned long int tag){
+void read(struct CacheLine* current,int linesPerSet,int setIndex,unsigned long int tag){
   size_t i = 0;
+  setIndex=setIndex-1;
+
+
   for (; i < linesPerSet; i++) { //finds location of matching tag
-    printf("cache[setIndex][i].tag:%ld\n",cache[setIndex][i]->tag);
-    printf("tag:%ld\n",tag);
-    if (cache[setIndex][i]->tag==tag){
+    if (cache[setIndex]->tag==tag){
       cachehit++;
       return;}
-    else if (cache[setIndex][i]->valid==0){
-      cache[setIndex][i]->tag=tag;
-      cache[setIndex][i]->valid=1;
+    else if (cache[setIndex]->valid==0){
+      cache[setIndex]->tag=tag;
+      cache[setIndex]->valid=1;
       memread++;
       cachemiss++;
       return;}
@@ -135,15 +144,10 @@ int main(int argc, char const *argv[argc+1]) {
     printf("offset: %ld setIndex: %ld tag: %ld\n", offset, setIndex, tag);
 
     struct CacheLine** cache=calloc(setSize,sizeof(struct CacheLine));
-    for (size_t i = 0; i < setSize; i++) {
-      cache[i]=calloc(linesPerSet,sizeof(struct CacheLine));
-      for (size_t j = 0; j < linesPerSet; j++) {
-        cache[i][j].valid=0;
-      }
-    }
+
 
     if(access[0]=='R'){
-      read(&cache,linesPerSet,setIndex,tag);
+      read(cache,linesPerSet,setIndex,tag);
     }
 
     else if(access[0]=='W'){
@@ -151,7 +155,7 @@ int main(int argc, char const *argv[argc+1]) {
     }
 
 
-    freeEverything(&cache,setSize,linesPerSet,blockSize);
+    freeEverything(cache,setSize,linesPerSet,blockSize);
     printf("\n");
   }
   printf("memread:%ld\nmemwrite:%ld\ncachehit:%ld\ncachemiss:%ld\n", memread,memwrite,cachehit,cachemiss);
