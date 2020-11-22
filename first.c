@@ -10,7 +10,6 @@ unsigned long int t;
 
 struct CacheLine{
   unsigned long int tag;
-  int valid;
   struct CacheLine* next;
 };
 
@@ -37,7 +36,7 @@ int checkSizes(int num1, int num2){
   return 1;
 }
 
-void freeNodes(struct Node* x){
+void freeNodes(struct CacheLine* x){
   if (x==0) return;
   freeNodes(x->next);
   free(x);
@@ -52,26 +51,42 @@ void freeEverything(struct CacheLine** cache, int setSize, int linesPerSet, int 
 }
 
 
-void read(struct CacheLine* current,int linesPerSet,int setIndex,unsigned long int tag){
-  size_t i = 0;
-  setIndex=setIndex-1;
+void read(struct CacheLine* current,int setIndex,int linesPerSet,unsigned long int tag){
+  size_t i = 1;
+  if(current->next==0){
+    current->next = malloc(sizeof(struct CacheLine));
+    current->next->tag=tag;
+    current->next->next=0;
+    memread++;
+    cachemiss++;
+    return;
+  }
 
-
-  for (; i < linesPerSet; i++) { //finds location of matching tag
-    if (cache[setIndex]->tag==tag){
+  current=current->next;
+  for (; current!=0; current=current->next) {
+    if (current->tag==tag){ //finds location of matching tag
       cachehit++;
       return;}
-    else if (cache[setIndex]->valid==0){
-      cache[setIndex]->tag=tag;
-      cache[setIndex]->valid=1;
-      memread++;
-      cachemiss++;
-      return;}
+    i++;
+    if(i==linesPerSet) break;
   }
+
+
   //if it's not found use policy
   memread++;
   cachemiss++;
   printf("not found: use policy\n");
+}
+
+void printList(struct CacheLine** cache, int setSize){
+  for (size_t i = 0; i < setSize; i++) {
+    struct CacheLine* current=cache[i];
+    while (current->next!=0) {
+      current=current->next;
+      printf("%ld-->",current->tag);
+    }
+    printf("\n");
+  }
 }
 
 int main(int argc, char const *argv[argc+1]) {
@@ -135,7 +150,13 @@ int main(int argc, char const *argv[argc+1]) {
 
   char access[2];
   unsigned long int address;
+  struct CacheLine **cache=calloc(setSize,sizeof(struct CacheLine));
+  for (size_t i = 0; i < setSize; i++) {
+    cache[i]=calloc(1,sizeof(struct CacheLine));
+    cache[i]->next=0;
+  }
   printf("\n");
+
   while(fscanf(f,"%s %lx",access,&address)!=EOF){
     printf("access:%s address:%lx\n", access, address);
     unsigned long int offset = address & ((1<<offsetBits)-1);
@@ -143,21 +164,18 @@ int main(int argc, char const *argv[argc+1]) {
     unsigned long int tag = (address >> (offsetBits+setBits)) & ((1<<tagBits)-1);
     printf("offset: %ld setIndex: %ld tag: %ld\n", offset, setIndex, tag);
 
-    struct CacheLine** cache=calloc(setSize,sizeof(struct CacheLine));
-
-
     if(access[0]=='R'){
-      read(cache,linesPerSet,setIndex,tag);
+      read(cache[setIndex],setIndex,linesPerSet,tag);
     }
 
     else if(access[0]=='W'){
 
     }
 
-
-    freeEverything(cache,setSize,linesPerSet,blockSize);
     printf("\n");
   }
+  printList(cache,setSize);
+  freeEverything(cache,setSize,linesPerSet,blockSize);
   printf("memread:%ld\nmemwrite:%ld\ncachehit:%ld\ncachemiss:%ld\n", memread,memwrite,cachehit,cachemiss);
   return EXIT_SUCCESS;
 }
