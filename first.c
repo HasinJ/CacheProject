@@ -6,6 +6,7 @@
 unsigned long int cacheSize, blockSize;
 unsigned long int memread=0, memwrite=0, cachehit=0, cachemiss=0;
 char policy[5];
+char assoc[7];
 unsigned long int t;
 
 struct CacheLine{
@@ -50,14 +51,41 @@ void freeEverything(struct CacheLine** cache, int setSize, int linesPerSet, int 
   free(cache);
 }
 
+void insertBeginning(struct CacheLine* current,unsigned long int tag){
+  struct CacheLine* temp = malloc(sizeof(struct CacheLine));
+  temp->tag=tag;
+  temp->next=current->next;
+  current->next=temp;
+}
+
 void insertEnd(struct CacheLine* end, unsigned long int tag){
   end->next=malloc(sizeof(struct CacheLine));
   end->next->tag=tag;
   end->next->next=0;
 }
 
+void removeAfterThis(struct CacheLine* current){
+  struct CacheLine* temp = current->next;
+  current->next=current->next->next;
+  free(temp);
+}
+
+void fifo(struct CacheLine** cache, struct CacheLine* current, unsigned long int tag, int setIndex, int linesPerSet){
+  removeAfterThis(cache[setIndex]);
+  if(linesPerSet==1){
+    struct CacheLine* temp = malloc(sizeof(struct CacheLine));
+    temp->tag=tag;
+    temp->next=0;
+    cache[setIndex]->next=temp;
+    return;
+  }
+  insertEnd(current,tag);
+  return;
+}
+
 void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long int tag){
   struct CacheLine* current = cache[setIndex];
+  struct CacheLine* before=0;
   size_t i = 0;
   if(current->next==0){
     current->next = malloc(sizeof(struct CacheLine));
@@ -69,10 +97,18 @@ void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long
   }
 
   while(current->next!=0){
-    current=current->next;
-    if (current->tag==tag){ //finds location of matching tag
+    if(current->next->tag==tag){ //finds location of matching tag
       cachehit++;
-      return;}
+      printf("hitting\n");
+      if(policy[0]=='l' && linesPerSet!=1 && current->next->next!=0){
+        removeAfterThis(current);
+        insertBeginning(cache[setIndex],tag);
+        return;
+      }
+      return;
+    }
+    before=current;
+    current=current->next;
     i++;
     if(i==linesPerSet) break;
   }
@@ -82,31 +118,28 @@ void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long
   //if it isnt found and set not full
   printf("i: %ld\n",i);
   if(i!=linesPerSet){
-    insertEnd(current,tag);
-    return;
-  }
-
-  //if it's not found use policy
-  printf("not found: use policy\n");
-  if(policy[0]=='f'){
-    struct CacheLine* temp = cache[setIndex]->next;
-    cache[setIndex]->next=cache[setIndex]->next->next;
-    free(temp);
-    if(linesPerSet==1){
-      struct CacheLine* temp = malloc(sizeof(struct CacheLine));
-      temp->tag=tag;
-      temp->next=0;
-      cache[setIndex]->next=temp;
+    if(policy[0]=='l' && linesPerSet!=1) {
+      insertBeginning(cache[setIndex],tag);
       return;
     }
     insertEnd(current,tag);
     return;
   }
 
+  //if it's not found use policy
+  printf("not found: use policy\n");
+  if (policy[0]=='l' && linesPerSet!=1) {
+    removeAfterThis(before);
+    insertBeginning(cache[setIndex],tag);
+    return;
+  }
+  fifo(cache, current, tag, setIndex, linesPerSet);
+  return;
 }
 
 void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long int tag){
   struct CacheLine* current = cache[setIndex];
+  struct CacheLine* before=0;
   size_t i = 0;
   if(current->next==0){
     current->next = malloc(sizeof(struct CacheLine));
@@ -119,11 +152,19 @@ void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned lon
   }
 
   while(current->next!=0){
-    current=current->next;
-    if (current->tag==tag){ //finds location of matching tag
+    if (current->next->tag==tag){ //finds location of matching tag
       memwrite++;
       cachehit++;
-      return;}
+      printf("hitting\n");
+      if(policy[0]=='l' && linesPerSet!=1 && current->next->next!=0){
+        removeAfterThis(current);
+        insertBeginning(cache[setIndex],tag);
+        return;
+      }
+      return;
+    }
+    before=current;
+    current=current->next;
     i++;
     if(i==linesPerSet) break;
   }
@@ -134,26 +175,23 @@ void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned lon
   //if it isnt found and set not full
   printf("i: %ld\n",i);
   if(i!=linesPerSet){
+    if(policy[0]=='l' && linesPerSet!=1) {
+      insertBeginning(cache[setIndex],tag);
+      return;
+    }
     insertEnd(current,tag);
     return;
   }
 
   //if it's not found use policy
   printf("not found: use policy\n");
-  if(policy[0]=='f'){
-    struct CacheLine* temp = cache[setIndex]->next;
-    cache[setIndex]->next=cache[setIndex]->next->next;
-    free(temp);
-    if(linesPerSet==1){
-      struct CacheLine* temp = malloc(sizeof(struct CacheLine));
-      temp->tag=tag;
-      temp->next=0;
-      cache[setIndex]->next=temp;
-      return;
-    }
-    insertEnd(current,tag);
+  if (policy[0]=='l' && linesPerSet!=1) {
+    removeAfterThis(before);
+    insertBeginning(cache[setIndex],tag);
     return;
   }
+  fifo(cache, current, tag, setIndex, linesPerSet);
+  return;
 
 }
 
@@ -186,7 +224,6 @@ int main(int argc, char const *argv[argc+1]) {
   }
 
 
-  char assoc[7];
   unsigned long int n = 0;
   strcpy(policy,argv[3]);
 
@@ -227,8 +264,6 @@ int main(int argc, char const *argv[argc+1]) {
   printf("setBits: %ld\n",setBits);
   printf("linesPerSet: %ld\n",linesPerSet);
 
-
-
   char access[2];
   unsigned long int address;
   struct CacheLine **cache=calloc(setSize,sizeof(struct CacheLine));
@@ -240,9 +275,9 @@ int main(int argc, char const *argv[argc+1]) {
 
   while(fscanf(f,"%s %lx",access,&address)!=EOF){
     printf("access:%s address:%lx\n", access, address);
-    unsigned long int offset = address & ((1<<offsetBits)-1);
-    unsigned long int setIndex = (address>>offsetBits) & ((1<<setBits)-1);
-    unsigned long int tag = (address >> (offsetBits+setBits)) & ((1<<tagBits)-1);
+    unsigned long int offset = address & ((1lu<<offsetBits)-1);
+    unsigned long int setIndex = (address>>offsetBits) & ((1lu<<setBits)-1);
+    unsigned long int tag = (address >> (offsetBits+setBits)) & ((1lu<<tagBits)-1);
     printf("offset: %ld setIndex: %ld tag: %ld access: %s\n", offset, setIndex, tag, access);
 
     if(access[0]=='R'){
