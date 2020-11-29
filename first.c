@@ -99,8 +99,8 @@ void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long
   while(current->next!=0){
     if(current->next->tag==tag){ //finds location of matching tag
       cachehit++;
-      printf("hitting\n");
-      if(policy[0]=='l' && linesPerSet!=1 && current->next->next!=0){
+      //printf("hitting\n");
+      if(policy[0]=='l' && linesPerSet!=1){
         removeAfterThis(current);
         insertBeginning(cache[setIndex],tag);
         return;
@@ -116,7 +116,7 @@ void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long
   cachemiss++;
 
   //if it isnt found and set not full
-  printf("i: %ld\n",i);
+  //printf("i: %ld\n",i);
   if(i!=linesPerSet){
     if(policy[0]=='l' && linesPerSet!=1) {
       insertBeginning(cache[setIndex],tag);
@@ -127,7 +127,7 @@ void read(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned long
   }
 
   //if it's not found use policy
-  printf("not found: use policy\n");
+  //printf("not found: use policy\n");
   if (policy[0]=='l' && linesPerSet!=1) {
     removeAfterThis(before);
     insertBeginning(cache[setIndex],tag);
@@ -155,8 +155,8 @@ void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned lon
     if (current->next->tag==tag){ //finds location of matching tag
       memwrite++;
       cachehit++;
-      printf("hitting\n");
-      if(policy[0]=='l' && linesPerSet!=1 && current->next->next!=0){
+      //printf("hitting\n");
+      if(policy[0]=='l' && linesPerSet!=1){
         removeAfterThis(current);
         insertBeginning(cache[setIndex],tag);
         return;
@@ -173,7 +173,7 @@ void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned lon
   memwrite++;
 
   //if it isnt found and set not full
-  printf("i: %ld\n",i);
+  //printf("i: %ld\n",i);
   if(i!=linesPerSet){
     if(policy[0]=='l' && linesPerSet!=1) {
       insertBeginning(cache[setIndex],tag);
@@ -184,7 +184,7 @@ void write(struct CacheLine** cache, int setIndex, int linesPerSet, unsigned lon
   }
 
   //if it's not found use policy
-  printf("not found: use policy\n");
+  //printf("not found: use policy\n");
   if (policy[0]=='l' && linesPerSet!=1) {
     removeAfterThis(before);
     insertBeginning(cache[setIndex],tag);
@@ -238,9 +238,6 @@ int main(int argc, char const *argv[argc+1]) {
   else if(argv[2][0]=='a')  strcpy(assoc,"full");
   else strcpy(assoc,argv[2]);
 
-  printf("n%ld\n",n);
-  printf("assoc: %s\n", assoc);
-
   FILE *f;
   f = fopen(argv[5],"r");
   if (f==0){
@@ -258,12 +255,15 @@ int main(int argc, char const *argv[argc+1]) {
   unsigned long int offsetBits=log2(blockSize);
   unsigned long int setBits=log2(setSize);
   unsigned long int tagBits = 48 - setBits - offsetBits;
+/*
+  printf("\nn%ld\n",n);
+  printf("assoc: %s\n", assoc);
   printf("tagBits: %ld\n",tagBits);
   printf("offsetBits: %ld\n",offsetBits);
   printf("setSize: %ld\n",setSize);
   printf("setBits: %ld\n",setBits);
   printf("linesPerSet: %ld\n",linesPerSet);
-
+*/
   char access[2];
   unsigned long int address;
   struct CacheLine **cache=calloc(setSize,sizeof(struct CacheLine));
@@ -271,14 +271,17 @@ int main(int argc, char const *argv[argc+1]) {
     cache[i]=calloc(1,sizeof(struct CacheLine));
     cache[i]->next=0;
   }
-  printf("\n");
+  //printf("\n");
 
   while(fscanf(f,"%s %lx",access,&address)!=EOF){
-    printf("access:%s address:%lx\n", access, address);
-    unsigned long int offset = address & ((1lu<<offsetBits)-1);
-    unsigned long int setIndex = (address>>offsetBits) & ((1lu<<setBits)-1);
-    unsigned long int tag = (address >> (offsetBits+setBits)) & ((1lu<<tagBits)-1);
-    printf("offset: %ld setIndex: %ld tag: %ld access: %s\n", offset, setIndex, tag, access);
+
+    //unsigned long int offset = address & ((1lu<<offsetBits)-1lu);
+    unsigned long int setIndex = (address>>offsetBits) & ((1lu<<setBits)-1lu);
+    unsigned long int tag = (address >> (offsetBits+setBits)) & ((1lu<<tagBits)-1lu);
+
+    //printf("access:%s address:%lx\n", access, address);
+    //printf("offset: %ld setIndex: %ld tag: %ld access: %s\n", offset, setIndex, tag, access);
+
 
     if(access[0]=='R'){
       read(cache,setIndex,linesPerSet,tag);
@@ -288,9 +291,9 @@ int main(int argc, char const *argv[argc+1]) {
       write(cache,setIndex,linesPerSet,tag);
     }
 
-    printf("\n");
+    //printf("\n");
   }
-  printList(cache,setSize);
+  //printList(cache,setSize);
   freeEverything(cache,setSize,linesPerSet,blockSize);
   printf("memread:%ld\nmemwrite:%ld\ncachehit:%ld\ncachemiss:%ld\n", memread,memwrite,cachehit,cachemiss);
   return EXIT_SUCCESS;
