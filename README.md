@@ -1,2 +1,0 @@
-# CacheProject
-Simulates cache system
