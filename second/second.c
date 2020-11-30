@@ -90,14 +90,14 @@ void removeAfterThis(struct CacheLine* current){
   free(temp);
 }
 
-void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct CacheLine* current2, struct CacheLine* before2, unsigned long int L1setIndex, unsigned long int L2setIndex, size_t j, int L2linesPerSet) {
+void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct CacheLine* current2,struct CacheLine* current, struct CacheLine* before2, unsigned long int L1setIndex, unsigned long int L2setIndex, size_t j, int L2linesPerSet) {
 
   if(j==L2linesPerSet) {
     printf("no space in L2 set, need to evict L2\n");
     //lru
     if (L2policy[0]=='l' && L2linesPerSet!=1) {
       removeAfterThis(before2);
-      insertBeginning2(L2cache[L2setIndex],L1cache[L1setIndex]->next->L1tag,L1cache[L1setIndex]->next->L2tag);
+      insertBeginning2(L2cache[L2setIndex],current->L1tag,current->L2tag);
       return;
     }
     //fifo
@@ -116,9 +116,16 @@ void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct C
 
   //L2 has space but set is empty
   if(L2cache[L2setIndex]->next==0){
+    if(L2policy[0]=='l'){
+      L2cache[L2setIndex]->next = malloc(sizeof(struct CacheLine));
+      L2cache[L2setIndex]->next->L1tag=current->L1tag;
+      L2cache[L2setIndex]->next->L2tag=current->L2tag;
+      L2cache[L2setIndex]->next->next=0;
+      return;
+    }
     L2cache[L2setIndex]->next = malloc(sizeof(struct CacheLine));
-    L2cache[L2setIndex]->next->L1tag=L1cache[L1setIndex]->next->L1tag;;
-    L2cache[L2setIndex]->next->L2tag=L1cache[L1setIndex]->next->L2tag;;
+    L2cache[L2setIndex]->next->L1tag=L1cache[L1setIndex]->next->L1tag;
+    L2cache[L2setIndex]->next->L2tag=L1cache[L1setIndex]->next->L2tag;
     L2cache[L2setIndex]->next->next=0;
     return;
   }
@@ -126,7 +133,7 @@ void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct C
   //L2set not full
   if(j!=L2linesPerSet){
     if(L2policy[0]=='l' && L2linesPerSet!=1) {
-      insertBeginning2(L2cache[L2setIndex],L1cache[L1setIndex]->next->L1tag,L1cache[L1setIndex]->next->L2tag);
+      insertBeginning2(L2cache[L2setIndex],current->L1tag,current->L2tag);
       return;
     }
     insertEnd2(current2,L1cache[L1setIndex]->next->L1tag,L1cache[L1setIndex]->next->L2tag);
@@ -220,7 +227,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
 
   printf("not found and L1 full: use L1policy and evict into L2\n");
   if (L1policy[0]=='l' && L1linesPerSet!=1) {
-    //moveIntoL2
+    moveIntoL2(L2cache, L1cache, current2, current, before2, L1setIndex, L2setIndex, j, L2linesPerSet);
     removeAfterThis(before);
     insertBeginning(L1cache[L1setIndex]);
     return;
@@ -228,7 +235,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
 
   //fifo
   printf("evict L1cache[L1setIndex]->next->L1tag: %ld\n",L1cache[L1setIndex]->next->L1tag);
-  moveIntoL2(L2cache, L1cache, current2, before2, L1setIndex, L2setIndex, j, L2linesPerSet);
+  moveIntoL2(L2cache, L1cache, current2, current, before2, L1setIndex, L2setIndex, j, L2linesPerSet);
   removeAfterThis(L1cache[L1setIndex]);
   if(L1linesPerSet==1){
     struct CacheLine* temp = malloc(sizeof(struct CacheLine));
