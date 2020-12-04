@@ -188,7 +188,7 @@ void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct C
 
 void L1printList(struct CacheLine** cache, int setSize){
   for (size_t i = 0; i < setSize; i++) {
-    if(i>57 || i<44) continue;
+    if(cache[i]->next==0) continue;
     struct CacheLine* current=cache[i];
     printf("set: %ld\n",i);
     while (current->next!=0) {
@@ -339,7 +339,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
 
   //printf("not found and L1 full: use L1policy and evict into L2\n");
   if (L1policy[0]=='l' && L1linesPerSet!=1) {
-    moveIntoL2(L2cache, L1cache, current2, current, before2, L1setIndex, L2setIndex, j, L2linesPerSet, address);
+    //moveIntoL2(L2cache, L1cache, current2, current, before2, L1setIndex, L2setIndex, j, L2linesPerSet, address);
     removeAfterThis(before);
     insertBeginning(L1cache[L1setIndex],address);
     return;
@@ -592,6 +592,7 @@ int main(int argc, char const *argv[argc+1]) {
   printf("L2offsetBits: %ld\n",L2offsetBits);
   printf("L2setSize: %ld\n",L2setSize);
   printf("L2setBits: %ld\n",L2setBits);
+  */
   printf("L2linesPerSet: %ld\n\n",L2linesPerSet);
 */
   struct CacheLine **L1cache=calloc(L1setSize,sizeof(struct CacheLine));
