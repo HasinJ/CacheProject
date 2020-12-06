@@ -166,15 +166,12 @@ void moveIntoL2(struct CacheLine** L2cache, struct CacheLine** L1cache, struct C
       //printf("current->address:%lx\n",current->address);
       //printf("setIndex:%lx\n",setIndex);
 
-      //printf("no space in L2 set, need to evict L2\n");
+      printf("no space in L2 set, need to evict L2\n");
       if(L2linesPerSet==1)  { //next=0
         printf("L2linesPerSet==1\n");
-        removeAfterThis(L2cache[setIndex]);
-        if(L1policy[0]=='l'){
-          insertBeginning2(L2cache[setIndex],current->L1tag,current->L2tag,current->address);
-          return;
-        }
-        insertBeginning2(L2cache[setIndex],L1cache[L1setIndex]->L1tag,L1cache[L1setIndex]->L2tag,L1cache[L1setIndex]->address);
+        free(L2cache[setIndex]->next);
+        L2cache[setIndex]->next=0;
+        insertBeginning2(L2cache[setIndex],current->L1tag,current->L2tag,current->address);
         return;
       }
 
@@ -348,7 +345,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
       //printf("current2->next->L2tag: %lx\n", current2->L2tag);
 
       L2cachehit++;
-      //printf("L2 hit, need to move to L1 and evict L1 to L2\n");
+      printf("L2 hit, need to move to L1 and evict L1 to L2\n");
       if(i!=L1linesPerSet)  printf("\n\nERROR BIG PLZ FIX\n\n");
 
       /************************************************************
@@ -410,7 +407,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
     return;
   }
 
-  //printf("not found and L1 full: use L1policy and evict into L2\n");
+  printf("not found and L1 full: use L1policy and evict into L2\n");
   if (L1policy[0]=='l' && L1linesPerSet!=1) {
     moveIntoL2(L2cache, L1cache, current2, current, before2, L1setIndex, L2setIndex, j, L2linesPerSet, address);
     removeAfterThis(before);
@@ -666,20 +663,20 @@ int main(int argc, char const *argv[argc+1]) {
   L1offsetBits=log2(L1blockSize), L2offsetBits=log2(L2blockSize);
   L1setBits=log2(L1setSize), L2setBits=log2(L2setSize);
   L1tagBits = 48 - L1setBits - L1offsetBits, L2tagBits = 48 - L2setBits - L2offsetBits;
-  L2linesPerSet=3; //careful with this
-/*
-  printf("\nL1tagBits: %ld\n",L1tagBits);
-  printf("L1offsetBits: %ld\n",L1offsetBits);
-  printf("L1setSize: %ld\n",L1setSize);
-  printf("L1setBits: %ld\n",L1setBits);
-  printf("L1linesPerSet: %ld\n",L1linesPerSet);
+  //L1linesPerSet=32; //careful with this
 
+  //printf("\nL1tagBits: %ld\n",L1tagBits);
+  //printf("L1offsetBits: %ld\n",L1offsetBits);
+  //printf("L1setSize: %ld\n",L1setSize);
+  //printf("L1setBits: %ld\n",L1setBits);
+  printf("L1linesPerSet: %ld\n",L1linesPerSet);
+/*
   printf("\nL2tagBits: %ld\n",L2tagBits);
   printf("L2offsetBits: %ld\n",L2offsetBits);
   printf("L2setSize: %ld\n",L2setSize);
   printf("L2setBits: %ld\n",L2setBits);
   printf("L2linesPerSet: %ld\n\n",L2linesPerSet);
-*/
+
   struct CacheLine **L1cache=calloc(L1setSize,sizeof(struct CacheLine));
   for (size_t i = 0; i < L1setSize; i++) {
     L1cache[i]=calloc(1,sizeof(struct CacheLine));
@@ -712,11 +709,14 @@ int main(int argc, char const *argv[argc+1]) {
 
     if(access[0]=='R'){
       read(L1cache,L1linesPerSet,L2cache,L2linesPerSet,address);
+<<<<<<< HEAD
       /*
       if(checked==0){
         //printf("\naddress: 0x%lx access:%s\n", address, access);
         checkDuplicates(L2cache,L2setSize);
       }*/
+=======
+>>>>>>> 7d8db5d74f211aced8770a9a2e8c8e3b010cc335
       continue;
     }
 
