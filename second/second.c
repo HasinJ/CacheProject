@@ -17,10 +17,6 @@ struct CacheLine{
   struct CacheLine* next;
 };
 
-struct List{
-  struct CacheLine* head;
-  struct Cacheline* tail;
-};
 
 void freeNodes(struct CacheLine* x){
   if (x==0) return;
@@ -130,7 +126,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
   unsigned long int L2tag = (address >> (L2offsetBits+L2setBits)) & ((1lu<<L2tagBits)-1lu);
 
   //printf("address: 0x%lx\n", address);
-  printf("L1setIndex: %ld L1tag: %ld L2setIndex: %ld \nL2tag: %ld\n\n", L1setIndex, L1tag, L2setIndex, L2tag);
+  printf("L1setIndex: %ld L1tag: %ld L2setIndex: %ld \nL2tag: %ld\n", L1setIndex, L1tag, L2setIndex, L2tag);
 
   //printf("address: 0x%lx\n", address);
   //printf("L1setIndex: %ld L1tag: %ld L2setIndex: %ld \nL2tag: %ld\n", L1setIndex, L1tag, L2setIndex, L2tag);
@@ -215,8 +211,8 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
   }
 
   //fifo
-  removeAfterThis(L1cache[L1setIndex]);
   if(L1linesPerSet==1){
+    removeAfterThis(L1cache[L1setIndex]);
     struct CacheLine* temp = malloc(sizeof(struct CacheLine));
     temp->L1tag=L1tag;
     temp->L2tag=L2tag;
@@ -225,6 +221,68 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
     L1cache[L1setIndex]->next=temp;
     return;
   }
+
+  unsigned long int tempaddress = L1cache[L1setIndex]->next->address;
+  unsigned long int tempL1tag = L1cache[L1setIndex]->next->L1tag;
+  unsigned long int tempL2tag = L1cache[L1setIndex]->next->L2tag;
+
+  removeAfterThis(L1cache[L1setIndex]);
+
+  if(L2policy[0]=='f'){
+    unsigned long int setIndex = (tempaddress>>L2offsetBits) & ((1lu<<L2setBits)-1lu);
+
+    //if set is empty
+    if(L2cache[setIndex]->next==0){
+      printf("L2 set is empty\n");
+      L2cache[setIndex]->next=malloc(sizeof(struct CacheLine));
+      L2cache[setIndex]->next->L1tag=tempL1tag;
+      L2cache[setIndex]->next->L2tag=tempL2tag;
+      L2cache[setIndex]->next->address=tempaddress;
+      L2cache[setIndex]->next->next=0;
+      insertEnd(current,L1tag,L2tag,address);
+      return;
+    }
+
+    //if set has only 1
+    if(L2linesPerSet==1){
+      printf("L2 has only has 1 linesPerSet\n");
+      removeAfterThis(L2cache[L2setIndex]);
+      struct CacheLine* temp = malloc(sizeof(struct CacheLine));
+      temp->L1tag=L1tag;
+      temp->L2tag=L2tag;
+      temp->address=address;
+      temp->next=0;
+      L2cache[setIndex]->next=temp;
+      insertEnd(current,L1tag,L2tag,address);
+      return;
+    }
+
+    //check if set is full
+    current2=L2cache[setIndex]->next;
+    j=1;
+    while(current2->next!=0){
+      current2=current2->next;
+      j++;
+    }
+    //printf("j: %ld\n", j);
+
+    //if set is full
+    if(j==L2linesPerSet){
+      printf("L2 set IS full, evict L2 \n");
+      removeAfterThis(L2cache[setIndex]);
+      insertEnd(current2,tempL1tag,tempL2tag,tempaddress);
+      insertEnd(current,L1tag,L2tag,address);
+      return;
+    }
+
+    //if set isnt full
+    printf("L2 set ISNT full \n");
+    insertEnd(current2,tempL1tag,tempL2tag,tempaddress);
+    insertEnd(current,L1tag,L2tag,address);
+    return;
+  }
+
+  //printf("temp->address: %ld\n", temp->address);
   insertEnd(current,L1tag,L2tag,address);
   return;
 
@@ -343,11 +401,13 @@ int main(int argc, char const *argv[argc+1]) {
 
     if(access[0]=='R'){
       read(L1cache,L1linesPerSet,L2cache,L2linesPerSet,address);
+      printf("\n");
       continue;
     }
 
     if(access[0]=='W'){
       write(L1cache,L1linesPerSet,L2cache,L2linesPerSet,address);
+      printf("\n");
       continue;
     }
 
