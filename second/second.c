@@ -174,17 +174,31 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
   //then search inside L2
   size_t j = 0;
   struct CacheLine* current2 = L2cache[L2setIndex];
-  struct CacheLine* before2=current2;
   while(current2->next!=0){
     if(current2->next->L2tag==L2tag){
-      if(L2linesPerSet!=1){
-        before2=current2;
-        current2=before2->next;
-      }
       //printf("before2->address: %lx\n", before2->address);
+
       L2cachehit++;
+      unsigned long int tempaddress = current2->next->address;
+      unsigned long int tempL1tag = current2->next->L1tag;
+      unsigned long int tempL2tag = current2->next->L2tag;
+
+      if(L1policy[0]=='f'){
+        unsigned long int setIndex = (tempaddress>>L1offsetBits) & ((1lu<<L1setBits)-1lu);
+        current=L1cache[setIndex];
+        while(current->next!=0){
+          current=current->next;
+        }
+        insertEnd(current,tempL1tag,tempL2tag,tempaddress);
+
+        tempaddress = L1cache[L1setIndex]->next->address;
+        tempL1tag = L1cache[L1setIndex]->next->L1tag;
+        tempL2tag = L1cache[L1setIndex]->next->L2tag;
+        removeAfterThis(L1cache[setIndex]);
+        return;
+      }
+
     }
-    before2=current2;
     current2=current2->next;
     j++;
     if(j==L2linesPerSet) break;
@@ -228,6 +242,7 @@ void read(struct CacheLine** L1cache, int L1linesPerSet, struct CacheLine** L2ca
 
   removeAfterThis(L1cache[L1setIndex]);
 
+  //evicted L1 line into L2
   if(L2policy[0]=='f'){
     unsigned long int setIndex = (tempaddress>>L2offsetBits) & ((1lu<<L2setBits)-1lu);
 
