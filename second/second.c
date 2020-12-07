@@ -1578,6 +1578,12 @@ int main(int argc, char const *argv[argc+1]) {
     return EXIT_SUCCESS;
   }
 
+  FILE *f;
+  f = fopen(argv[8],"r");
+  if (f==0){
+    printf("error\n");
+    return EXIT_SUCCESS;
+  }
   unsigned long int L1cacheSize=atoi(argv[1]), L1blockSize=atoi(argv[4]), L2cacheSize=atoi(argv[5]), L2blockSize=L1blockSize;
 /*
   printf("L1cacheSize: %ld\n",L1cacheSize);
@@ -1659,13 +1665,6 @@ int main(int argc, char const *argv[argc+1]) {
   for (size_t i = 0; i < L2setSize; i++) {
     L2cache[i]=calloc(1,sizeof(struct CacheLine));
     L2cache[i]->next=0;
-  }
-
-  FILE *f;
-  f = fopen(argv[8],"r");
-  if (f==0){
-    printf("error\n");
-    return EXIT_SUCCESS;
   }
 
   char access[2];
